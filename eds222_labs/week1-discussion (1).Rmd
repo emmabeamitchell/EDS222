@@ -75,7 +75,7 @@ Now, use `source` to run the script `_common.R`, which loads all the packages we
 
 ```{r,include=TRUE}
 
-source(here::here("eds222-labs","_common.R"))
+source(here::here("eds222_labs","_common.R"))
 ```
 
 For labs, we want to see all our code. Set your `knitr` options to `echo=TRUE` so you see all your code and output.
@@ -83,6 +83,7 @@ For labs, we want to see all our code. Set your `knitr` options to `echo=TRUE` s
 ```{r,include=TRUE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
 ```{r}
 source(here::here("eds222-labs","_common.R"))
 

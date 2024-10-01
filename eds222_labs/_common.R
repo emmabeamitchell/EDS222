@@ -1,12 +1,3 @@
-
---- 
-
-  
-  
-   
----
-
-
 # _common.R based on R4DS: https://github.com/hadley/r4ds/blob/master/_common.R
 set.seed(25)
 options(digits = 3)

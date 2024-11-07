@@ -1,0 +1,39 @@
+---
+title: "week2-discussion"
+output: html_document
+date: "2024-10-08"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(tidyverse)
+```
+
+```{r, lln2, echo=FALSE, fig.height=4.8}
+set.seed(1234)
+
+lln_norm <- tibble(
+  n_sz = sample(5:500, 1e4, replace = TRUE),
+  sample_mean = sapply(n_sz, function(n) mean(rnorm(n)))
+)
+
+ggplot(data=lln_norm) +
+  geom_point(aes(x = n_sz, y = sample_mean), alpha = 0.25, shape = 20) +
+  geom_hline(yintercept = 0,
+             color = "cyan4") +
+  labs(x = "sample size",
+       y = "sample mean") +
+  theme_bw()
+ 
+```
+
+
+```{r, lln2, echo=FALSE, fig.height=4.8}
+
+
+
+
+
+```
+

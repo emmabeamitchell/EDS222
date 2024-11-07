@@ -1,0 +1,23 @@
+---
+title: "interactions"
+format: html
+editor_options: 
+  chunk_output_type: console
+---
+
+Use palmer penguins to fit a model that has an interaction between a CONTINUOUS and categorical variable
+
+use palmer penguins to fit a model that has an interaction between two continuous variables
+
+interpret the coefficients
+
+```{r}
+library(tidyverse)
+library(palmerpenguins)
+penguins <- penguins
+```
+
+```{r}
+lm(body_mass_mm ~ flipper_length_mm + sex + flipper_length_mm : sex, penguins )
+```
+

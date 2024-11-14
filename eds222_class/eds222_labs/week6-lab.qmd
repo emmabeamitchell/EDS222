@@ -205,8 +205,10 @@ coef_optim <- optim(c(beta0 = 0, beta1 = 0),
 # Hint: explore coef_optim
 
 coef_optim
-beta0_hat = -2.422124762 
-beta1_hat = beta1 = 0.004398142
+beta0_hat <- -2.422124762 
+beta1_hat <- 0.004398142
+
+
 ```
 
 beta0 = -2.422124762
@@ -218,7 +220,7 @@ beta1 = 0.004398142
 
 ```{r}
 # Create and plot predictions
-beta0 +beta1 *pcthisp
+beta0 +beta1 * pcthisp
 violations_zero <- inv_logit(-2.422124762 + 0.004398142 * 0)
 violations_zero
 violations_fifty <- inv_logit(-2.422124762 + 0.004398142 * 50)
@@ -231,39 +233,46 @@ p = inv_logit(logit_p)
 
 tibble(pcthisp = 0:100,
        logitP = beta0_hat + beta1_hat *pcthisp,
-       p = inv_logit(logit_p)) 
-
-  ggplot(aes(pcthisp, p )) +
-  geom_line()
+       p = inv_logit(logitP)) %>% 
+      ggplot(aes(pcthisp, p )) +
+      geom_line()
 ```
 
 3.  How much does the probability of a drinking water violation change when percent Hispanic population increases from 10 to 20%, 45 to 55%, and 80 to 90%?
 
 ```{r}
+inv_logit(-2.422124762 + 0.004398142 * 10) - inv_logit(-2.422124762 + 0.004398142 * 20)
+
+inv_logit(-2.422124762 + 0.004398142 * 45) - inv_logit(-2.422124762 + 0.004398142 * 55)
+
+inv_logit(-2.422124762 + 0.004398142 * 80) - inv_logit(-2.422124762 + 0.004398142 * 90)
 ```
 
 4.  How would you interpret the coefficients? What do the slope and intercept mean in this context? Where is the relationship linear, and where is it non-linear?
+
+    **The coefficients define a linear function *in logit space*. The intercept is the value of the logit(p) when percent Hispanic is 0. The slope is the change in logit(p) for a 1-percent increase in Hispanic population. p itself is non-linearly related to percent Hispanic population, because the logit function is not linear.**
+
 5.  Create a "DEM" of the likelihood landscape for $\beta_0$ and $\beta_1$. Choose a range of $\beta_0$ and $\beta_1$ values around your best estimates, calculate the likelihood for each combination, and create a figure with $\beta_0$ on the x-axis, $\beta_1$ on the y-axis, and the likelihood as the fill. Add a point for $(\hat\beta_0, \hat\beta_1)$.\
     Bonus problem: add contours!
 
 ```{r}
 likelihood_dem <- expand_grid(
-  ???,
-  ???
-) %>% 
+  beta0 = seq(-3, -2, length.out = 20),
+  beta1 = seq(0.0, 0.01, length.out = 20)) |>
   mutate(coefficients = mapply(function(b0, b1) c(beta0 = b0, beta1 = b1),
-                               ???, ???,
+                               beta0, beta1,
                                SIMPLIFY = FALSE),
          negloglik = sapply(coefficients, 
-                            ???, 
-                            data = ???),
-         likelihood = ???)
+                            likelihood_fun, 
+                            data = drinking_water_complete),
+         likelihood = exp(-negloglik))
 
-ggplot(likelihood_dem, aes(???, ???, fill = ???)) +
+ggplot(likelihood_dem, aes(beta0, beta1, fill = negloglik)) +
   geom_raster() +
-  geom_point(x = ???, y = ???, color = "red")
-
+  geom_point(x = -2.42, y = 0.00439, color = "red")
 ```
+
+tells us that our model is very sensitive to changing intercept, but not sensitive to beta1 (slope) change
 
 # Fit the full logistic regression model using `glm()`
 
@@ -272,7 +281,7 @@ Normally we won't need to write our own likelihood functions and use optimizatio
 Here's how to fit the same model from the previous section. Notice the formula and data arguments look very similar to what we'd use for `lm()`. But now we have to specify the response variable's "family" (i.e., the type of random variable) and the link function we want to use (logit, in our case).
 
 ```{r}
-pcthisp_glm <- glm(violations ~ pcthisp, 
+pcthisp_glm <- glm(violation ~ pcthisp, 
                    family = binomial(link = "logit"),
                    data = drinking_water)
 summary(pcthisp_glm)
@@ -284,7 +293,9 @@ summary(pcthisp_glm)
 1.  How would you fit a model that includes an interaction term between ethnicity and SES?
 
 ```{r}
-interaction_glm <- ???
+interaction_glm <- glm(violation ~ pcthisp + medianincomehouse + pcthisp: medianincomehouse,
+                       family = binomial(link = "logit"),
+                       data = drinking_water)
 summary(interaction_glm)
 
 ```
@@ -293,14 +304,23 @@ summary(interaction_glm)
 
 ```{r}
 predictions <- expand_grid(
-  pcthisp = ???,
-  medianincomehouse = ???
+  pcthisp = seq(0, 100, length.out = 100),
+  medianincomehouse = seq(2000, 10000, length.out = 100)
 ) %>% 
-  mutate(violations = predict(???, 
+  mutate(violations = predict(interaction_glm, 
                               newdata = ., 
-                              type = ???))
+                              type = "response"))
 
 # Create plot
+ggplot(predictions, aes(pcthisp, 
+                        medianincomehouse, 
+                        fill = violations)) +
+  geom_raster() +
+  scale_fill_gradient(low = "navy", high = "firebrick") +
+  labs(x = "Percent Hispanic population",
+       y = "Median household income",
+       fill = "Pr(violation)")
+
 
 ```
 

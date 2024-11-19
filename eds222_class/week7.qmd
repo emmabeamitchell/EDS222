@@ -78,6 +78,9 @@ ggplot(bernoulli_df, aes(x = factor(x), y = probability)) +
 7.  Which R function would help you solve problem 4 above? Write the code below.
 
 ```{r}
+
+obs <- c(0,0,1,1)
+prod(dbinom(obs, size = 1, prob = .5))
 ```
 
 ## Link functions

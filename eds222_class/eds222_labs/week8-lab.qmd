@@ -1,327 +1,344 @@
 ---
-title: "week8code"
-author: "Emma"
-date: "`r Sys.Date()`"
-output: html_document
+title: "EDS222 Week 8 Lab: Hypothesis testing"
+format: 
+  html:
+    echo: true
+    eval: false
+    code-tools: true
+bibliography: references.bib
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r}
+#| label: setup
+#| include: false
+
 library(tidyverse)
+library(here)
+theme_set(theme_classic(14))
+
 ```
 
+# To lead poison a mockingbird
+
+## Background
+
+Lead is an important contaminant in urban areas with well-known impacts on human health, but do non-human animals also face risks from lead exposure? Hitt *et al.* investigated this question by measuring lead levels in soil and the blood of breeding mockingbirds, as well as egg hatching and offspring development [@hitt2023]. We will replicate parts of their analysis here.
+
+## Get the data
+
+The data for this study were deposited in the Dryad Data Repository and are available [here](https://datadryad.org/stash/dataset/doi:10.5061/dryad.tht76hf3v). Download the full dataset and put them in the appropriate folder of your RStudio project.
+
+Read the northern mockingbird nestling data ("NOMO_Nest_Data.csv") and nestling lead data ("NestlingPb.csv") into data frames called `nest_data` and `nestlingpb_data`, respectively. Filter both data frames to the Uptown and Lakeshore neighborhoods.
 
 ```{r}
+#| label: load-data
 
-# Create data
-# Sea star wasting syndrome
-ssws_data <- tibble(
-  year = c(rep(2015, 25), rep(2024, 25)),
-  ssws_present = c(rep("Present", 19), rep("Absent", 6),
-                   rep("Present", 11), rep("Absent", 14))
-) %>% 
-  mutate(x = rep(1:5, 10),
-         y = rep(rep(1:5, each = 5), 2))
-```
-```{r}
-# Visualize it
-ggplot(ssws_data, aes(x, y, fill = ssws_present)) +
-  geom_raster() +
-  scale_fill_manual(values = c("cornflowerblue", "firebrick")) +
-  facet_wrap(~year) +
-  theme_void(18) +
-  theme(axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        axis.title = element_blank(),
-        aspect.ratio = 1,
-        legend.title = element_blank(),
-        legend.position = "top")
+nestling <- read_csv("C:/meds/EDS222-stats/eds222_class/eds222_labs/mockingbird_data/NestlingPb.csv") |> 
+  filter(hood %in% c("uptown", "lakeshore"))
+
+NOMO_Nest <- read_csv("C:/meds/EDS222-stats/eds222_class/eds222_labs/mockingbird_data/NOMO_Nest_data.csv") |>
+  filter(hood %in% c("ls", "up"))
+
+
 ```
 
-```{r}
-# Create shuffling 12 times
-lapply(1:12, \(i) { # applying a function to a vector and returning a list
-  ssws_data %>% 
-    mutate(ssws_present = sample(ssws_present, nrow(.))) %>% 
-    ggplot(aes(x, y, fill = ssws_present)) +
-    geom_raster() +
-    scale_fill_manual(values = c("cornflowerblue", "firebrick")) +
-    facet_wrap(~year) +
-    theme_void(18) +
-    theme(axis.text = element_blank(),
-          axis.ticks = element_blank(),
-          axis.title = element_blank(),
-          aspect.ratio = 1,
-          legend.position = "none",
-          plot.background = element_rect(color = "grey80", fill = NA),
-          plot.margin = unit(c(3, 3, 3, 3), "mm"))
-}) %>% 
-  cowplot::plot_grid(plotlist = ., nrow = 3)
-```
+## Hypothesis testing by randomization
+
+*Do mockingbirds in a neighborhood with higher lead concentration have less successful nests?*
+
+We'll investigate this question using randomization hypothesis testing.
+
+### Nest success
+
+`nest_data` contains columns `hood` and `bin.status`, representing the neighborhood and *binary status* (at least one chick fledged or not) for each monitored nest. Visualize how nest success (i.e., binary status) varied by neighborhood.
 
 ```{r}
-# Create null distribution from the shuffling
-set.seed(21130)
-null_dist <- replicate(500, { # replicate this 500x
-  shuffled <- ssws_data %>% 
-    mutate(ssws_present = sample(ssws_present, nrow(.))) %>% # shuffling happens here
-    group_by(year) %>% 
-    summarize(prop = mean(ssws_present == "Present")) # calculating the means for SSWS present 
-  with(shuffled, prop[year == 2024] - prop[year == 2015])
+#| label: visualize-success
+
+ggplot(NOMO_Nest, aes(hood, fill = factor(bin.status))) + # using factor to tell ggplot it's a discrete value
+  geom_bar() +
+  scale_fill_brewer("Nest success", palette = "Dark2")
+```
+
+#### Step 1: state the null and alternative hypotheses
+
+*H~0~*: neighborhood has no effect on nest success
+*H~A~*: neighborhood has an effect on nest success
+
+#### Step 2: calculate the point statistic
+
+1\) What is the relevant sample statistic for our hypothesis?
+
+Difference in proportions
+
+2\) How would you calculate it?
+
+```{r}
+#| label: point-estimate-success
+
+
+
+```
+
+#### Step 3: quantify the uncertainty
+
+Use randomization to simulate the distribution of the sample statistic under the null hypothesis.
+
+```{r}
+#| label: randomization-success
+
+null_dist <- replicate(1000, {
+  nest_success <- NOMO_Nest |> 
+    mutate(hood = sample(hood, n()))|> 
+    group_by(hood) |> 
+    summarize(prop = sum(bin.status)/n())
+
+point_estimate_success <- nest_success$prop[2] - nest_success$prop[1]
+
+point_estimate_success
 })
-# Pass the output into a tibble for ggplot
-tibble(null_dist) %>% 
-  ggplot(aes(null_dist)) +
-  geom_histogram(binwidth = 0.1) +
-  labs(x = "Difference in proportions (2024 - 2015)",
-       y = "Count (out of 500 shuffles)") +
-  xlim(-0.5, 0.5) +
-  theme_classic(18)
-observed <- 11/25 - 19/25 # proportion of observed in between sampled years 
-sum(abs(null_dist) >= abs(observed)) # how many times is the absolute value of the null_dist greater than or equal to the observed
-mean(abs(null_dist) >= abs(observed)) # p value
+
+ggplot(tibble(null_dist), aes (null_dist)) +
+  geom_histogram(bins = 20,
+                 color = "cornflowerblue",
+                 fill = NA) +
+  geom_vline(xintercept = point_estimate_success, 
+             color = "firebrick")
+
+
 ```
-## Same thing but for the solar panel simulation
+
+#### Step 4: calculate probability of the point estimate under the null
+
+What's the p-value?
+
 ```{r}
-# Alternative example (solar panel adoption)
-solar_data <- tibble(
-  treatment = c(rep("Tax break", 25), rep("No tax break", 25)),
-  solar = c(rep("Installed", 21), rep("Not installed", 4),
-            rep("Installed", 16), rep("Not installed", 9))
-) %>% 
-  mutate(x = rep(1:5, 10),
-         y = rep(rep(1:5, each = 5), 2))
-ggplot(solar_data, aes(x, y, fill = solar)) +
-  geom_raster() +
-  scale_fill_manual(values = c("darkorchid", "goldenrod")) +
-  facet_wrap(~ treatment, ncol = 1) +
-  theme_void(18) +
-  theme(axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        axis.title = element_blank(),
-        aspect.ratio = 1,
-        legend.title = element_blank(),
-        legend.position = "top")
-null_dist <- replicate(500, {
-  shuffled <- solar_data %>% 
-    mutate(solar = sample(solar, nrow(.))) %>% 
-    group_by(treatment) %>% 
-    summarize(prop = mean(solar == "Installed"))
-  with(shuffled, prop[treatment == "Tax break"] - prop[treatment == "No tax break"])
+#| label: pval-success
+
+sum(abs(null_dist) > abs(point_estimate_success)) / length(null_dist)
+```
+
+#### Step 5: reject or fail to reject the null
+
+### Nestling blood lead levels
+
+Now it's your turn. Perform a similar analysis to investigate whether nestling blood Pb levels vary by neighborhood. Use `nestlingpb_data` for this part, column `blood_ug_dl_pbwt`.
+
+First, visualize the blood Pb levels by neighborhood. What's an appropriate type of visualization for this?
+
+```{r}
+#| label: visualize-bloodpb
+
+ggplot(nestling, aes(hood, blood_ug_dl_pbwt)) + 
+  geom_boxplot() 
+```
+
+#### Step 1: state the null and alternative hypotheses
+
+*H~0~: neighborhood has no effect on nestling blood Pb levels
+H~A~:* neighborhood has an effect on nestling blood Pb levels
+
+#### Step 2: calculate the point statistic
+
+1\) What is the relevant sample statistic for our hypothesis?
+
+difference in mean
+
+2\) How would you calculate it?
+
+```{r}
+#| label: point-estimate-bloodpb
+
+  
+mean_pb <- nestling |> 
+  group_by(hood) |> 
+summarize(mean = mean(blood_ug_dl_pbwt)) 
+
+lead_diff <- mean_pb$mean[2] - mean_pb$mean[1]
+
+lead_diff
+
+
+ggplot(tibble(null_dist), aes(null_dist)) + 
+  geom_histogram(bins = 20,
+                 color = "cornflowerblue",
+                 fill = NA) +
+  geom_vline(xintercept = point_estimate_success,
+             color = "firebrick")
+
+
+```
+
+#### Step 3: quantify the uncertainty
+
+Use randomization to simulate the distribution of the sample statistic under the null hypothesis.
+
+```{r}
+#| label: randomization-bloodpb
+
+mean_pb <- replicate(1000, {
+  nestling |> 
+    group_by(hood) |> 
+    summarize(mean = mean(blood_ug_dl_pbwt)) 
+  
+  lead_diff <- mean_pb$mean[2] - mean_pb$mean[1]
+  
+  lead_diff
 })
-observed_difference <- 21/25 - 16/25
-tibble(null_dist) %>% 
-  ggplot(aes(null_dist)) +
-  geom_histogram(binwidth = 0.05) +
-  geom_vline(xintercept = observed_difference, 
-             linewidth = 2, 
-             color = "firebrick") +
-  labs(x = "Difference in proportions",
-       y = "Count (out of 500 shuffles)") +
-  xlim(-0.5, 0.5) +
-  theme_classic(18)
-tibble(null_dist) %>% 
-  ggplot(aes(null_dist)) +
-  geom_histogram(aes(fill = abs(null_dist) >= abs(observed_difference)),
-                 binwidth = 0.05) +
-  geom_vline(xintercept = observed_difference, 
-             linewidth = 2, 
-             color = "firebrick") +
-  scale_fill_manual(values = c("cornflowerblue", "orchid1")) +
-  labs(x = "Difference in proportions",
-       y = "Count (out of 500 shuffles)") +
-  xlim(-0.5, 0.5) +
-  theme_classic(18) +
-  theme(legend.position = "none")
-tibble(null_dist) %>% 
-  ggplot(aes(null_dist)) +
-  geom_histogram(aes(fill = null_dist >= observed_difference),
-                 binwidth = 0.05) +
-  geom_vline(xintercept = observed_difference, 
-             linewidth = 2, 
-             color = "firebrick") +
-  scale_fill_manual(values = c("cornflowerblue", "orchid1")) +
-  labs(x = "Difference in proportions",
-       y = "Count (out of 500 shuffles)") +
-  xlim(-0.5, 0.5) +
-  theme_classic(18) +
-  theme(legend.position = "none")
-tibble(null_dist) %>% 
-  ggplot(aes(null_dist)) +
-  geom_histogram(aes(fill = null_dist < observed_difference),
-                 binwidth = 0.05) +
-  geom_vline(xintercept = observed_difference, 
-             linewidth = 2, 
-             color = "firebrick") +
-  scale_fill_manual(values = c("cornflowerblue", "orchid1")) +
-  labs(x = "Difference in proportions",
-       y = "Count (out of 500 shuffles)") +
-  xlim(-0.5, 0.5) +
-  theme_classic(18) +
-  theme(legend.position = "none")
+
+ggplot(tibble(mean_pb), aes(mean_pb)) + 
+  geom_histogram(bins = 20,
+                 color = "cornflowerblue",
+                 fill = NA) +
+  geom_vline(xintercept = lead_diff,
+             color = "firebrick")
+
 ```
+
+#### Step 4: calculate probability of the point estimate under the null
+
+What's the p-value?
 
 ```{r}
-# Now with regression
-set.seed(2102)
-# Make dataset with simulated density for Pisaster sea stars and sea urchins
-urchin_barrens <- tibble(
-  pisaster_density = rnorm(100, mean = 3, sd = 0.5),
-  urchin_density = rnorm(100, mean = 6 - 0.75 * pisaster_density, sd = 1.5)
-)
-ggplot(urchin_barrens, aes(pisaster_density, urchin_density)) +
-  geom_point(size = 3, shape = 21, 
-             color = "navy", 
-             fill = "navy",
-             alpha = 0.5) +
-  geom_smooth(method = "lm", se = FALSE, color = "plum", linewidth = 2) +
-  labs(x = expression("Sea star density " * (ind ~ m^{-2})),
-       y = expression("Urchin density " * (ind ~ m^{-2}))) +
-  theme_classic(18)
-# beta1
-beta1 <- coef(lm(urchin_density ~ pisaster_density, urchin_barrens))[2]
-beta1
-# draw 6 random samples from the dataset and fit a regression line through them
-lapply(1:6, \(i) {
-  urchin_barrens %>% 
-    mutate(pisaster_density = sample(pisaster_density, nrow(.))) %>% 
-    ggplot(aes(pisaster_density, urchin_density)) +
-    geom_point(size = 3, shape = 21, 
-               color = "navy", 
-               fill = "navy",
-               alpha = 0.5) +
-    geom_smooth(method = "lm", se = FALSE, color = "plum", linewidth = 2) +
-    labs(x = expression("Sea star density " * (ind ~ m^{-2})),
-         y = expression("Urchin density " * (ind ~ m^{-2}))) +
-    theme_classic(12) +
-    theme(plot.background = element_rect(color = "grey80", fill = NA),
-          plot.margin = unit(c(3, 3, 3, 3), "mm"))
-}) %>% 
-  cowplot::plot_grid(plotlist = ., nrow = 2)
-# replicate the random sampling 500x, fit a regression model for each of these replicates, and get the beta1 of each of them. 
-null_dist <- replicate(500, {
-  shuffled <- urchin_barrens %>% 
-    mutate(pisaster_density = sample(pisaster_density, nrow(.)))
-  coef(lm(urchin_density ~ pisaster_density, shuffled))[2]
-})
-# Get the range for the null_dist object (500 beta1 values drawn for the regression on the 500 random samples)
-range(null_dist)
-# Make into tibble for plotting
-tibble(null_dist) %>% 
-  ggplot(aes(null_dist)) +
-  geom_histogram(binwidth = 0.1) +
-  labs(x = "Sea star density coefficient",
-       y = "Count (out of 500 shuffles)") +
-  xlim(-1.1, 1.1) +
-  theme_classic(18)
-sum(abs(null_dist) >= abs(beta1))
-mean(abs(null_dist) >= abs(beta1))
+#| label: pval-bloodpb
+
 ```
+
+#### Step 5: reject or fail to reject the null
+
+## Hypothesis testing by normal approximation
+
+Rather than using randomization to simulate the null distribution, it's often easier to approximate it as a normal distribution.
+
+***Does nestling blood Pb level have a relationship with feather Pb level?***
+
+First, visualize the relationship between the two variables.
 
 ```{r}
-# central limit theorem
-set.seed(2219)
-# create log-normal data
-nonnormal <- tibble(x = rlnorm(1e4, meanlog = 2, sdlog = 0.5))
-# draw random samples from the mean of the lognormal distribution
-clt <- tibble(mean_x = replicate(1e4, mean(sample(nonnormal$x, 1e3))))
-# plot them
-ggplot(nonnormal, aes(x)) +
-  geom_histogram() +
-  xlim(0, 50) +
-  theme_classic(18)
-ggplot(clt, aes(mean_x)) +
-  geom_histogram() +
-  labs(x = expression(mu)) +
-  theme_classic(18)
+#| label: blood-feathers-visualization
+
+
 ```
+
+#### Step 1: state the null and alternative hypotheses
+
+*H~0~: \
+H~A~:*
+
+#### Step 2: calculate the point statistic
+
+1\) What is the relevant sample statistic for our hypothesis?
+
+regression coefficient
+
+2\) How would you calculate it?
 
 ```{r}
-# Standard error of the difference of means
-library(palmerpenguins)
-penguins %>% 
-  filter(species %in% c("Adelie", "Gentoo")) %>% 
-  ggplot(aes(x = body_mass_g)) +
-  geom_histogram(color = "blue", fill = NA) +
-  facet_grid(species ~ .) +
-  labs(x = "Body mass (g)") +
-  theme_classic(18)
-ggplot(tibble(difference = seq(-500, 1500),
-              density = dnorm(difference, mean = 0, sd = 58.8))) +
-  geom_line(aes(difference, density), linewidth = 2, alpha = 0) +
-  geom_vline(xintercept = 1375, color = "firebrick", linewidth = 2) +
-  labs(x = "Difference in means",
-       y = "Probability density") +
-  theme_classic(18)
-penguins %>% 
-  filter(species == "Adelie",
-         island %in% c("Biscoe", "Dream")) %>% 
-  drop_na(body_mass_g) %>% 
-  ggplot(aes(x = body_mass_g)) +
-  geom_histogram(color = "blue", fill = NA, bins = 15) +
-  facet_grid(island ~ .) +
-  labs(x = "Body mass (g)") +
-  theme_classic(18)
-# difference between islands?
-adelie_biscoe <- with(penguins, # Why use with?
-                      body_mass_g[species == "Adelie" &
-                                    island == "Biscoe"])
-adelie_dream <- with(penguins, 
-                     body_mass_g[species == "Adelie" &
-                                   island == "Dream"])
-obs_diff <- mean(adelie_biscoe - adelie_dream) # remember this is wrong
-obs_diff <- mean(adelie_biscoe) - mean(adelie_dream)
-se <- function(a, b) {
-  a <- na.omit(a)
-  b <- na.omit(b)
-  sqrt(sd(a)^2 / length(a) + sd(b)^2 / length(b))
-}
-se_diff <- se(adelie_biscoe, adelie_dream)
-pval <- 2 * pnorm(-abs(obs_diff), 
-                  mean = 0, 
-                  sd = se_diff)
-pval <- 2 * pnorm(0, 
-                  mean = -abs(obs_diff), 
-                  sd = se_diff) # Remember this is a probability - must be between 0 and 1.
+#| label: blood-feathers-lm
+
+blood_feathers_lm <- lm(feather_ug_g_pbwt ~ blood_ug_dl_pbwt,
+                        nestling)
+
+summary(blood_feathers_lm)
+
 ```
+
+#### Step 3: quantify the uncertainty
+
+Use the standard error of the regression coefficient to visualize the distribution of the sample statistic under the null hypothesis.
 
 ```{r}
-# standard error of a regression coefficient
-ggplot(penguins, aes(x = body_mass_g, y = bill_length_mm)) +
-  geom_point(shape = 21, color = "blue", fill = "navy", alpha = 0.5) +
-  labs(x = "Body mass (g)",
-       y = "Bill length (mm)") +
-  geom_smooth(method = "lm", se = FALSE, color = "firebrick", linewidth = 2) +
-  theme_classic(18) +
-  theme(plot.margin = unit(c(3, 8, 3, 3), "mm"))
-summary(lm(bill_length_mm ~ body_mass_g, penguins))
-# Visualizing z-scores
-z_score_plot <- function(sd) { # number of SEs away from the mean
-  ggplot(tibble(x = seq(-4 * sd, 4 * sd, length.out = 200),
-                density = dnorm(x, 0, sd)),
-         aes(x, density)) +
-    geom_line(linewidth = 1.5, color = "cornflowerblue") +
-    geom_vline(xintercept = c(-1.96, 1.96) * sd, 
-               linewidth = 1.5, 
-               color = "firebrick",
-               alpha = 0.5) +
-    labs(title = sprintf("SD = %0.1f", sd)) +
-    theme_classic(14)
-}
-lapply(c(0.2, 1, 20), z_score_plot) %>% # apply?
-  cowplot::plot_grid(plotlist = ., nrow = 1)
+#| label: blood-feathers-null
+
+beta1_estimate <- summary(blood_feathers_lm)$coefficients[2,1]
+
+beta1_se <- summary(blood_feathers_lm)$coefficients[2,2]
+
+tibble(beta1 = seq(-(beta1_estimate + beta1_se),
+                   beta1_estimate + beta1_se,
+                   length.out = 200),
+       density = dnorm(beta1, mean = 0, sd = beta1_se)) |> 
+  ggplot(aes(beta1, density)) +
+  geom_line(color = "cornflowerblue") +
+  geom_vline(xintercept = beta1_estimate, color = "firebrick")
+
 ```
-Collapse
 
+#### Step 4: calculate probability of the point estimate under the null
 
+What's the p-value? Use `pnorm()` to get the probability of a point estimate at least as extreme as the observed.
 
+```{r}
+#| label: blood-feathers-pval
 
+pval <- 2 * pnorm(-abs(beta1_estimate), mean = 0, sd = beta1_se)
+pval
+```
 
+::: callout-note
+Our calculate p-value is much lower than the p-value from the summary of our linear model. In class I told you `lm()` uses a *Student's t-distribution* instead of a normal distribution for calculating the p-value. When sample sizes are large, the normal distribution and t-distribution are virtually identical. With only 22 complete data points, our sample size is relatively small. Therefore the t-distribution has *thicker tails* and yields a larger p-value. Hence the discrepancy.
+:::
 
+#### Step 5: reject or fail to reject the null
 
+### Sensitivity to outliers
 
+Revisit the visualization of the blood and feather Pb levels. One point seems to be an extreme outlier, and it seems to be exerting a strong influence on our model. Repeat the previous analysis with that point removed, then answer the question below.
 
+```{r}
+#| label: remove-outlier
 
+```
 
+**Question:** Of the two analyses (with and without the outlier), which had a lower p-value? Does that make it a better analysis?
 
+## Confidence intervals
 
+For the last part of today's lab we will construct confidence intervals around the point estimate of the blood Pb level coefficient. Here's the plan:
+
+1.  Simulate a population of nestlings, with the same relationship between blood and feather Pb levels as the observed sample.
+
+2.  Draw a new sample of nestlings from the simulated population. Create a confidence interval for the point estimate of the blood Pb level coefficient in this sample.
+
+3.  Repeat the process 100 times.
+
+\~95% of our 95% CIs should contain the population parameter.
+
+### 1. Simulate the population
+
+```{r}
+#| label: blood-feather-pop
+
+```
+
+### 2. Create one confidence interval
+
+```{r}
+#| label: blood-feather-ci
+
+```
+
+### 3. Repeat the process
+
+How many 95% CIs contain the population parameter?
+
+```{r}
+#| label: repeat-ci
+
+```
+
+## Recap
+
+-   Randomization allows us to simulate the null distribution, which we can use to quantify the probability of our result if the null hypothesis is true.
+
+    -   `sample()` and `replicate()` are helpful here!
+
+    -   Randomization doesn't make assumptions about the normality of the sample statistic, but it does assume the sample is representative of the population.
+
+-   By assuming the sample statistic is normally distributed, we can use standard errors to conduct hypothesis testing.
+
+    -   R will calculate standard errors for us for most sample statistics, such as regression coefficients.
+
+-   We can also use standard errors to construct confidence intervals.
+
+    -   By simulating a population, we demonstrated \~95% of 95% CIs will contain the population parameter.
